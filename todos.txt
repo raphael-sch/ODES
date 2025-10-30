@@ -1,0 +1,3 @@
+- does prefix caching interfere?
+- endpoint for state on demand; only send parent_id-tree
+- enforce the same dtype: bfloat and float

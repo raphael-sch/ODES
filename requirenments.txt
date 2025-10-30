@@ -1,0 +1,4 @@
+conda create -n myenv python=3.12 -y
+conda activate myenv
+pip install --upgrade uv
+uv pip install vllm --torch-backend=auto

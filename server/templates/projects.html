@@ -1,0 +1,23 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Projects</title>
+</head>
+<body>
+    <h1>Projects</h1>
+    <table border="1">
+        <tr>
+            <th>Id</th>
+            <th>Name</th>
+            <th>Time Created</th>
+        </tr>
+        {% for project in projects %}
+        <tr>
+            <td>{{ project.id }}</td>
+            <td><a href="/project/{{ project.id }}">{{ project.name }}</a></td>
+            <td>{{ project.time_created }}</td>
+        </tr>
+        {% endfor %}
+    </table>
+</body>
+</html>

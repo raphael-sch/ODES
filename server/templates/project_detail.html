@@ -1,0 +1,929 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Project: {{ project.name }}</title>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bulma@0.9.4/css/bulma.min.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/flag-icon-css/6.6.6/css/flag-icons.min.css"/>
+    <script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+    <script src="https://cdn.socket.io/4.5.4/socket.io.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/moment.js/2.29.4/moment.min.js"></script>
+    <style>
+        body {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+        }
+
+        .hero {
+            background: linear-gradient(135deg, #1e3c72 0%, #2a5298 100%);
+        }
+
+        /* Force tags to stay on same line and make scrollable */
+        .tags {
+            flex-wrap: nowrap !important;
+            overflow-x: auto;
+            overflow-y: hidden;
+        }
+
+        .tags .tag {
+            white-space: nowrap;
+            flex-shrink: 0;
+        }
+
+        /* Custom scrollbar styling for tags */
+        .tags::-webkit-scrollbar {
+            height: 6px;
+        }
+
+        .tags::-webkit-scrollbar-track {
+            background: rgba(0, 0, 0, 0.1);
+            border-radius: 3px;
+        }
+
+        .tags::-webkit-scrollbar-thumb {
+            background: rgba(255, 255, 255, 0.3);
+            border-radius: 3px;
+        }
+
+        .tags::-webkit-scrollbar-thumb:hover {
+            background: rgba(255, 255, 255, 0.5);
+        }
+
+        .box {
+    background: rgba(255, 255, 255, 0.15);
+    backdrop-filter: blur(8px);
+    border: 1px solid rgba(255, 255, 255, 0.2);
+}
+
+        .hero-chart-box {
+            background: transparent;
+            backdrop-filter: none;
+            padding: 1rem;
+            margin: 0 5px;
+        }
+
+        .chart-title {
+            color: white;
+            font-size: 0.85rem;
+            font-weight: 600;
+            text-align: center;
+            margin-bottom: 0.75rem;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .main-content {
+            padding: 2rem 1.5rem;
+        }
+
+        /* Custom 7-column grid */
+        @media screen and (min-width: 1216px) {
+            .column.is-one-seventh-widescreen {
+                flex: none;
+                width: 14.2857%;
+            }
+        }
+
+        /* Worker Tile Customizations */
+        .worker-tile {
+            height: 100%;
+            transition: transform 0.2s, box-shadow 0.2s;
+            position: relative;
+            overflow: hidden;
+            aspect-ratio: 1 / 1;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .worker-tile:hover {
+            transform: translateY(-4px);
+            box-shadow: 0 8px 20px rgba(0,0,0,0.25);
+        }
+
+        .worker-tile::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            right: 0;
+            width: 80px;
+            height: 80px;
+            background: rgba(255,255,255,0.1);
+            border-radius: 50%;
+            transform: translate(25px, -25px);
+        }
+
+        .worker-tile.is-running {
+            background: linear-gradient(135deg, #11998e 0%, #38ef7d 100%);
+            color: white;
+        }
+
+        .worker-tile.is-waiting {
+            background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
+            color: white;
+        }
+
+        .worker-tile.is-timeout {
+            background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+            color: white;
+        }
+
+        .worker-tile .card-content {
+            position: relative;
+            z-index: 1;
+            padding: 1rem;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            height: 100%;
+        }
+
+        .worker-tile .title {
+            color: white;
+        }
+
+        .worker-tile .title {
+            margin-bottom: 0.5rem !important;
+            line-height: 1.2;
+        }
+
+        .worker-middle {
+            display: flex;
+            flex-direction: column;
+            align-items: flex-start;
+            justify-content: center;
+            flex: 1;
+            gap: 0.3rem;
+            padding-left: 1rem;
+        }
+
+        .worker-stat-row {
+            display: flex;
+            align-items: baseline;
+            gap: 0.4rem;
+        }
+
+        .stat-value {
+            font-size: 1.25rem;
+            font-weight: 600;
+            line-height: 1;
+            color: white;
+            opacity: 0.9;
+        }
+
+        .stat-label {
+            font-size: 0.7rem;
+            text-transform: lowercase;
+            opacity: 0.75;
+            color: white;
+        }
+
+        .worker-bottom {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-end;
+            gap: 0.5rem;
+        }
+
+        .worker-last-seen {
+            text-align: left;
+            font-weight: 600;
+        }
+
+        .worker-id-bottom {
+            text-align: right;
+            font-family: 'Courier New', monospace;
+            font-size: 0.7rem;
+            opacity: 0.9;
+            word-break: break-all;
+        }
+
+        @keyframes pulse {
+            0% {
+                transform: scale(1);
+                box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+            }
+            50% {
+                transform: scale(1.05);
+                box-shadow: 0 8px 25px rgba(255,255,255,0.4);
+            }
+            100% {
+                transform: scale(1);
+                box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+            }
+        }
+
+        .worker-tile.pulse-update {
+            animation: pulse 0.6s ease-in-out;
+        }
+
+        /* Table Customizations */
+        .table thead {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        }
+
+/* Alternate row colors directly on td cells */
+.table.is-striped tbody tr:nth-child(odd) td {
+    background-color: rgba(102, 126, 234, 0.3) !important; /* light purple-blue */
+}
+
+.table.is-striped tbody tr:nth-child(even) td {
+    background-color: rgba(118, 75, 162, 0.3) !important; /* slightly darker */
+}
+
+/* Hover effect */
+.table.is-hoverable tbody tr:hover td {
+    background-color: rgba(255, 255, 255, 0.25) !important;
+    transition: background-color 0.3s ease;
+}
+
+        /* Progress Bar */
+        .progress-wrapper {
+            margin-top: 0.5rem;
+        }
+
+        .progress {
+            height: 0.5rem;
+        }
+
+        .progress::-webkit-progress-value {
+            background: linear-gradient(90deg, #667eea 0%, #764ba2 100%);
+        }
+
+        .progress::-moz-progress-bar {
+            background: linear-gradient(90deg, #667eea 0%, #764ba2 100%);
+        }
+
+        /* Status Tags in Table */
+        .tag.is-status-running {
+            background-color: #d1f4e0;
+            color: #0d6832;
+        }
+
+        .tag.is-status-waiting {
+            background-color: #fff3cd;
+            color: #856404;
+        }
+
+        .tag.is-status-complete {
+            background-color: #cfe2ff;
+            color: #084298;
+        }
+
+        .tag.is-status-idle {
+            background-color: #e2e3e5;
+            color: #383d41;
+        }
+
+        .connection-status {
+            position: fixed;
+            top: 10px;
+            right: 10px;
+            padding: 0.5rem 1rem;
+            border-radius: 4px;
+            font-size: 0.85rem;
+            font-weight: 600;
+            z-index: 1000;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .connection-status.connected {
+            background-color: #d1f4e0;
+            color: #0d6832;
+        }
+
+        .connection-status.disconnected {
+            background-color: #f8d7da;
+            color: #721c24;
+        }
+
+        .connection-status .status-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+        }
+
+        .connection-status.connected .status-dot {
+            background-color: #0d6832;
+        }
+
+        .connection-status.disconnected .status-dot {
+            background-color: #721c24;
+        }
+    </style>
+    <script>
+        // Embedded initial data - will be populated by the server
+        const INITIAL_DATA = {
+            project_id: '{{ project.id }}',
+            metrics: {
+                train_reward: {{ metrics.train_reward | tojson }},
+                dev_accuracy: {{ metrics.dev_accuracy | tojson }},
+                kl: {{ metrics.kl | tojson }}
+            },
+            workers: {{ workers | tojson }},
+            tasks: {{ tasks | tojson }}
+        };
+    </script>
+    <script>
+        $(document).ready(function() {
+            let trainRewardChart = null;
+            let devAccuracyChart = null;
+            let klChart = null;
+            let socket = null;
+            const workerColorTimers = {}; // keep track of per-worker timers
+
+            // In-memory data stores (single source of truth)
+            let workersData = {};  // Keyed by worker.id
+            let tasksData = {};    // Keyed by task.id
+
+            // Initialize Socket.IO connection
+            function initializeSocketIO() {
+                socket = io({transports: ['websocket', 'polling']});
+
+                socket.on('connect', function() {
+                    console.log('Socket.IO connected');
+                    updateConnectionStatus(true);
+
+                    // Join the project room
+                    socket.emit('join_project', { project_id: INITIAL_DATA.project_id });
+                });
+
+                socket.on('disconnect', function() {
+                    console.log('Socket.IO disconnected');
+                    updateConnectionStatus(false);
+                });
+
+                // Listen for metrics updates (single value to append)
+                socket.on('metrics_update', function(data) {
+                    console.log('Received metrics update:', data);
+                    if (data.metric === 'train_reward') {
+                        INITIAL_DATA.metrics.train_reward.push(data.value);
+                        trainRewardChart = updateChart('train-reward-chart', INITIAL_DATA.metrics.train_reward, 'Train Reward', trainRewardChart);
+                    } else if (data.metric === 'dev_accuracy') {
+                        INITIAL_DATA.metrics.dev_accuracy.push(data.value);
+                        devAccuracyChart = updateChart('dev-accuracy-chart', INITIAL_DATA.metrics.dev_accuracy, 'Dev Accuracy', devAccuracyChart);
+                    } else if (data.metric === 'kl') {
+                        INITIAL_DATA.metrics.kl.push(data.value);
+                        klChart = updateChart('kl-chart', INITIAL_DATA.metrics.kl, 'KL', klChart);
+                    }
+                });
+
+                // Listen for individual worker updates
+                socket.on('worker_update', function(data) {
+                    console.log('Received worker update:', data);
+                    updateSingleWorker(data.worker);
+                });
+
+                // Listen for individual task updates
+                socket.on('task_update', function(data) {
+                    console.log('Received task update:', data);
+                    updateSingleTask(data.task);
+                });
+            }
+
+            // Update connection status indicator
+            function updateConnectionStatus(connected) {
+                let $status = $('.connection-status');
+                if ($status.length === 0) {
+                    $status = $('<div class="connection-status"></div>');
+                    $('body').append($status);
+                }
+
+                if (connected) {
+                    $status.removeClass('disconnected').addClass('connected');
+                    $status.html('<span class="status-dot"></span><span>Connected</span>');
+                } else {
+                    $status.removeClass('connected').addClass('disconnected');
+                    $status.html('<span class="status-dot"></span><span>Disconnected</span>');
+                }
+            }
+
+            // Generic function to update a chart
+            function updateChart(canvasId, metrics, label, chart) {
+                const ctx = document.getElementById(canvasId);
+                if (!ctx) return chart;
+
+                const ctxContext = ctx.getContext('2d', { alpha: true });
+
+                // Extract values from metrics array - it's a list of floats
+                const values = metrics.map((value, index) => ({
+                    x: index,
+                    y: value
+                }));
+
+                // Destroy existing chart if it exists
+                if (chart) {
+                    chart.destroy();
+                }
+
+                // Create new chart
+                return new Chart(ctxContext, {
+                    type: 'line',
+                    data: { datasets: [{ label, data: values, borderColor: 'rgba(255,255,255,0.9)', backgroundColor: 'transparent', tension: 0.4, fill: false, pointRadius: 0, pointHoverRadius: 3, borderWidth: 2 }] },
+                    options: {
+                        backgroundColor: 'transparent',
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        plugins: { legend: { display: false }, tooltip: { mode: 'index', intersect: false } },
+                        scales: {
+                            x: { type: 'linear', display: false, grid: { display: false }, border: { display: false } },
+                            y: { grid: { display: false }, ticks: { font: { size: 10 }, color: 'rgba(255,255,255,0.8)' }, border: { display: false } }
+                        },
+                        interaction: { mode: 'nearest', axis: 'x', intersect: false }
+                    }
+                });
+            }
+
+            // Function to initialize workers grid from embedded data
+            function initializeWorkersGrid(workers) {
+                const $workersSection = $('#workers-section');
+
+                // Populate in-memory data store
+                workers.forEach(worker => {
+                    workersData[worker.id] = worker;
+                });
+
+                // Filter out workers with timeout status
+                //const activeWorkers = workers ? workers.filter(function(worker) {
+                //    return worker.status !== 'timeout';
+                //}) : [];
+                const activeWorkers = workers.sort((a, b) => {
+  // If one is timeout and the other isn't, put timeout last
+  if (a.status === 'timeout' && b.status !== 'timeout') return 1;
+  if (a.status !== 'timeout' && b.status === 'timeout') return -1;
+
+  // Otherwise, sort by timestamp (ascending)
+  return a.timestamp - b.timestamp;
+});
+
+                if (!activeWorkers || activeWorkers.length === 0) {
+                    $workersSection.html(`
+                        <div class="notification is-warning is-light">
+                            <p class="has-text-centered">No active workers found (last 5 minutes)</p>
+                        </div>
+                    `);
+                    return;
+                }
+
+                let gridHTML = '<div class="columns is-multiline">';
+
+                $.each(activeWorkers, function(index, worker) {
+                    gridHTML += generateWorkerTileHTML(worker);
+                });
+
+                gridHTML += '</div>';
+                $workersSection.html(gridHTML);
+            }
+
+            // Function to update a single worker tile
+            function updateSingleWorker(workerUpdate) {
+                // Update in-memory data store (merge with existing data)
+                if (!workersData[workerUpdate.id]) {
+                    // New worker - initialize with defaults
+                    workersData[workerUpdate.id] = {
+                        id: workerUpdate.id,
+                        name: `Worker ${workerUpdate.id}`,
+                        status: 'waiting',
+                        num_jobs_completed: 0,
+                        tokens_per_second: 0,
+                        country: 'globe',
+                        last_seen: Math.floor(Date.now() / 1000)  // Current time in seconds
+                    };
+                }
+                console.log(workerUpdate);
+
+                // Merge update into existing data
+                workersData[workerUpdate.id] = {
+                    ...workersData[workerUpdate.id],
+                    ...workerUpdate
+                };
+
+                const worker = { ...workersData[workerUpdate.id] }; // shallow copy
+                const $existingTile = $(`[data-worker-id="${workerUpdate.id}"]`);
+
+                if ($existingTile.length > 0) {
+                    // Clear any pending timer for this worker
+                    // Clear any pending color update
+
+                    if (worker.status === 'waiting'){
+                        const statusClass = $existingTile.attr('class')
+                          ?.split(' ')
+                          .find(c => c.startsWith('is-'))
+                          ?.replace('is-', '');
+                        worker.status = statusClass;
+                    }
+
+                    if (worker.status !== 'timeout') {
+                        const newHTML = generateWorkerTileHTML(worker);
+                        $existingTile.closest('.column').replaceWith(newHTML);
+
+                        const $el = $(`[data-worker-id="${workerUpdate.id}"]`);
+                        $el.queue(function (next) {
+                            $el.addClass('pulse-update');
+                            setTimeout(function () {
+                                $el.removeClass('pulse-update');
+                                next(); // continue to next item in queue
+                            }, 600);
+                        });
+                    }
+
+                    setTimeout(function() {
+                        const worker = workersData[workerUpdate.id];
+                        console.log('in timer');
+                        console.log(worker.status);
+                        if (worker.status === 'running') {
+                            return;
+                        }
+                        const $existingTile = $(`[data-worker-id="${workerUpdate.id}"]`);
+                        const newHTML = generateWorkerTileHTML(worker);
+                        $existingTile.closest('.column').replaceWith(newHTML);
+
+                        const $el = $(`[data-worker-id="${workerUpdate.id}"]`);
+                        $el.queue(function(next) {
+                            $el.addClass('pulse-update');
+                            setTimeout(function() {
+                                $el.removeClass('pulse-update');
+                                next(); // continue to next item in queue
+                            }, 600);
+                        });
+                    }, 2000);
+
+
+
+                } else {
+                    // Add new tile
+                    const $workersSection = $('#workers-section');
+                    const $columns = $workersSection.find('.columns');
+
+                    if ($columns.length === 0) {
+                        // Create columns container if it doesn't exist
+                        $workersSection.html('<div class="columns is-multiline"></div>');
+                    }
+
+                    const newHTML = generateWorkerTileHTML(worker);
+                    $workersSection.find('.columns').prepend(newHTML);
+                }
+            }
+
+            // Function to generate worker tile HTML
+function generateWorkerTileHTML(worker) {
+    const statusClass = `is-${worker.status}`;
+
+    // Use country code for flag, fallback to globe
+    const countryCode = (worker.country || 'globe').toLowerCase();
+    const flagIcon = countryCode === 'globe'
+        ? '<i class="fas fa-globe"></i>'
+        : `<span class="fi fi-${countryCode}"></span>`;
+
+    const lastSeenSeconds = worker.last_seen || Math.floor(Date.now() / 1000);
+    const nowSeconds = Math.floor(Date.now() / 1000);
+    const duration = moment.duration(nowSeconds - lastSeenSeconds, 'seconds');
+    const lastSeenText = formatDuration(duration);
+
+    const workerId = worker.id;
+    const displayId = `ID: ${workerId}`;
+
+    const completedJobs = worker.num_jobs_completed || 0;
+    const tokensPerSecond = worker.tokens_per_second || 0;
+
+    return `
+        <div class="column is-one-seventh-widescreen is-one-fifth-desktop is-one-quarter-tablet is-half-mobile">
+            <div class="card worker-tile ${statusClass}" data-worker-id="${workerId}">
+                <div class="card-content">
+                    <div>
+                        <p class="title is-6" style="display:flex; align-items:center; gap:0.3rem;">
+                            ${flagIcon} ${$('<div>').text(worker.name).html()}
+                        </p>
+                    </div>
+                    <div class="worker-middle">
+                        <div class="worker-stat-row">
+                            <span class="stat-value">${completedJobs}</span>
+                            <span class="stat-label">jobs done</span>
+                        </div>
+                        <div class="worker-stat-row">
+                            <span class="stat-value">${tokensPerSecond}</span>
+                            <span class="stat-label">token/s</span>
+                        </div>
+                    </div>
+                    <div class="worker-bottom">
+                        <div class="worker-last-seen">
+                            <span class="is-size-7 last-seen-counter" data-last-seen="${lastSeenSeconds}">${lastSeenText}</span>
+                        </div>
+                        <div class="worker-id-bottom">
+                            <span class="is-size-7">${displayId}</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    `;
+}
+
+
+            // Function to initialize tasks table from embedded data
+            function initializeTasksTable(tasks) {
+                const $tasksSection = $('#tasks-section');
+
+                // Populate in-memory data store
+                tasks.forEach(task => {
+                    tasksData[task.id] = task;
+                });
+
+                if (!tasks || tasks.length === 0) {
+                    $tasksSection.html(`
+                        <div class="notification is-info is-light">
+                            <p class="has-text-centered">No tasks found for this project</p>
+                        </div>
+                    `);
+                    return;
+                }
+
+                let tableHTML = `
+                    <div class="table-container">
+                        <table class="table is-fullwidth is-hoverable is-striped">
+                            <thead>
+                                <tr>
+                                    <th>Task ID</th>
+                                    <th>Parent ID</th>
+                                    <th>Status</th>
+                                    <th>Progress</th>
+                                    <th>Runtime</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                `;
+
+                $.each(tasks, function(index, task) {
+                    tableHTML += generateTaskRowHTML(task);
+                });
+
+                tableHTML += `
+                            </tbody>
+                        </table>
+                    </div>
+                `;
+
+                $tasksSection.html(tableHTML);
+            }
+
+            // Function to update a single task row
+            function updateSingleTask(taskUpdate) {
+                // Update in-memory data store (merge with existing data)
+                if (!tasksData[taskUpdate.id]) {
+                    // New task - initialize with defaults
+                    tasksData[taskUpdate.id] = {
+                        id: taskUpdate.id,
+                        parent_id: null,
+                        status: 'waiting',
+                        num_jobs: 0,
+                        num_jobs_completed: 0,
+                        timestamp_start: null,
+                        timestamp_finish: null
+                    };
+                }
+
+                // Merge update into existing data
+                tasksData[taskUpdate.id] = {
+                    ...tasksData[taskUpdate.id],
+                    ...taskUpdate
+                };
+
+                const task = tasksData[taskUpdate.id];
+                const $existingRow = $(`tr[data-task-id="${taskUpdate.id}"]`);
+
+                if ($existingRow.length > 0) {
+                    // Update existing row
+                    const newHTML = generateTaskRowHTML(task);
+                    $existingRow.replaceWith(newHTML);
+                } else {
+                    // Add new row
+                    const $tbody = $('#tasks-section table tbody');
+                    if ($tbody.length > 0) {
+                        const newHTML = generateTaskRowHTML(task);
+                        $tbody.prepend(newHTML);
+                    } else {
+                        // If table doesn't exist, create it with this single task
+                        initializeTasksTable([task]);
+                    }
+                }
+            }
+
+            // Function to generate task row HTML
+            function generateTaskRowHTML(task) {
+                const progressPercent = task.num_jobs > 0
+                    ? ((task.num_jobs_completed / task.num_jobs) * 100).toFixed(1)
+                    : '0.0';
+
+                // Calculate runtime using moment.js (timestamps are integers in SECONDS from Python)
+                let runtime = '—';
+                let startTimestamp = '';
+                let endTimestamp = '';
+                let runtimeClass = '';
+
+                if (task.timestamp_start) {
+                    startTimestamp = task.timestamp_start;
+
+                    if (task.timestamp_finish) {
+                        // Task is finished, use finish time
+                        endTimestamp = task.timestamp_finish;
+                    } else {
+                        // Task is still running, will count up
+                        runtimeClass = 'runtime-counter';
+                    }
+
+                    const endTime = task.timestamp_finish ? task.timestamp_finish : Math.floor(Date.now() / 1000);
+                    const duration = moment.duration(endTime - startTimestamp, 'seconds');
+
+                    // Use custom formatting for precise duration
+                    runtime = formatDuration(duration);
+                }
+
+                // task.id and task.parent_id are integers
+                const parentIdDisplay = task.parent_id !== null ? task.parent_id : '—';
+
+                return `
+                    <tr data-task-id="${task.id}">
+                        <td>${task.id}</td>
+                        <td>${parentIdDisplay}</td>
+                        <td><span class="tag is-status-${task.status}">${$('<div>').text(task.status.toUpperCase()).html()}</span></td>
+                        <td>
+                            <div>
+                                ${task.num_jobs_completed} / ${task.num_jobs}
+                                <span class="has-text-grey">(${progressPercent}%)</span>
+                            </div>
+                            <div class="progress-wrapper">
+                                <progress class="progress is-primary" value="${progressPercent}" max="100">${progressPercent}%</progress>
+                            </div>
+                        </td>
+                        <td>
+                            <span class="${runtimeClass}" data-start="${startTimestamp}" data-end="${endTimestamp}">${runtime}</span>
+                        </td>
+                    </tr>
+                `;
+            }
+
+            // Function to format duration precisely (e.g., "2h 15m 30s")
+            function formatDuration(duration) {
+                const days = Math.floor(duration.asDays());
+                const hours = duration.hours();
+                const minutes = duration.minutes();
+                const seconds = duration.seconds();
+
+                if (days > 0) {
+                    return `${days}d ${hours}h`;
+                } else if (hours > 0) {
+                    return `${hours}h ${minutes}m`;
+                } else if (minutes > 0) {
+                    return `${minutes}m ${seconds}s`;
+                } else {
+                    return `${seconds}s`;
+                }
+            }
+
+            // Function to update last seen counters (counts up from last heartbeat)
+            function updateLastSeenCounters() {
+                const nowSeconds = Math.floor(Date.now() / 1000);
+                $('.last-seen-counter').each(function() {
+                    const $counter = $(this);
+                    const lastSeenSeconds = parseInt($counter.attr('data-last-seen'));
+                    if (!isNaN(lastSeenSeconds)) {
+                        const duration = moment.duration(nowSeconds - lastSeenSeconds, 'seconds');
+                        $counter.text(formatDuration(duration));
+                    }
+                });
+            }
+
+            // Function to update all runtime counters for running tasks
+            function updateRuntimeCounters() {
+                const nowSeconds = Math.floor(Date.now() / 1000);
+                $('.runtime-counter').each(function() {
+                    const $counter = $(this);
+                    const startSeconds = parseInt($counter.attr('data-start'));
+                    const endSeconds = parseInt($counter.attr('data-end'));
+
+                    if (!isNaN(startSeconds)) {
+                        // If there's an end timestamp, use it; otherwise use current time
+                        const endTime = endSeconds ? endSeconds : nowSeconds;
+                        const duration = moment.duration(endTime - startSeconds, 'seconds');
+
+                        // Use custom formatting for precise duration
+                        $counter.text(formatDuration(duration));
+                    }
+                });
+            }
+
+            trainRewardChart = updateChart('train-reward-chart', INITIAL_DATA.metrics.train_reward, 'Train Reward', trainRewardChart);
+            devAccuracyChart = updateChart('dev-accuracy-chart', INITIAL_DATA.metrics.dev_accuracy, 'Dev Accuracy', devAccuracyChart);
+            klChart = updateChart('kl-chart', INITIAL_DATA.metrics.kl, 'KL', klChart);
+
+            // Initialize workers grid
+            initializeWorkersGrid(INITIAL_DATA.workers);
+
+            // Initialize tasks table
+            initializeTasksTable(INITIAL_DATA.tasks);
+
+            // Initialize Socket.IO
+            initializeSocketIO();
+
+            // Update last seen counters every second (counts up from last heartbeat)
+            setInterval(updateLastSeenCounters, 1000);
+
+            // Update runtime counters every second
+            setInterval(updateRuntimeCounters, 1000);
+        });
+    </script>
+</head>
+<body>
+    <!-- Hero Header -->
+    <section class="hero is-info">
+        <div class="hero-body">
+            <div class="container">
+                <a href="/" class="has-text-white mb-3 is-block">
+                    <i class="fas fa-arrow-left"></i> Back to Projects
+                </a>
+                <div style="display: flex; justify-content: space-between; align-items: flex-start; gap: 1rem;">
+                    <h1 class="title is-2 has-text-white" style="margin-bottom: 0;">
+                        {{ project.name }}
+                    </h1>
+                    <span class="tag is-warning is-medium" style="font-family: 'Courier New', monospace; flex-shrink: 0; display: flex; align-items: center; gap: 0.5rem;">
+                        <a href="https://github.com" target="_blank" style="color: inherit; display: flex; align-items: center;">
+                            <i class="fab fa-github" style="font-size: 1.2rem;"></i>
+                        </a>
+                        python vllm_client.py --url https://odesapi.schumann.pub --project_id {{ project.id }}
+                    </span>
+                </div>
+                <div class="tags are-medium mt-3 mb-0" style="flex-wrap: wrap !important;">
+                    <span class="tag is-info">
+                        <strong>Dataset:</strong>&nbsp;{{ project.dataset }}
+                    </span>
+                    <span class="tag is-link">
+                        <strong>Model:</strong>&nbsp;{{ project.model }}
+                    </span>
+                </div>
+                <div class="tags are-medium mt-0" style="flex-wrap: wrap !important;">
+                    <span class="tag is-primary" style="background-color: #465d83">
+                        <strong>Hyperparameters:</strong>&nbsp;{{ project.hyperparameters }}
+                    </span>
+                </div>
+                <div class="mt-4">
+                    <div class="columns is-gapless">
+                        <div class="column is-one-third">
+                            <div class="hero-chart-box">
+                                <h3 class="chart-title">Train Reward</h3>
+                                <canvas id="train-reward-chart" style="max-height: 150px;"></canvas>
+                            </div>
+                        </div>
+                        <div class="column is-one-third">
+                            <div class="hero-chart-box">
+                                <h3 class="chart-title">Dev Accuracy</h3>
+                                <canvas id="dev-accuracy-chart" style="max-height: 150px;"></canvas>
+                            </div>
+                        </div>
+                        <div class="column is-one-third">
+                            <div class="hero-chart-box">
+                                <h3 class="chart-title">KL</h3>
+                                <canvas id="kl-chart" style="max-height: 150px;"></canvas>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Main Content -->
+    <div class="main-content">
+        <div class="container">
+
+            <!-- Workers Section -->
+            <div class="box">
+                <h2 class="title is-4 mb-4">Workers</h2>
+                <div id="workers-section">
+                    <div class="notification is-info is-light">
+                        <p class="has-text-centered">
+                            <i class="fas fa-spinner fa-pulse"></i> Loading workers...
+                        </p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Task History Section -->
+            <div class="box">
+                <h2 class="title is-4 mb-4">Task History</h2>
+                <div id="tasks-section">
+                    <div class="notification is-info is-light">
+                        <p class="has-text-centered">
+                            <i class="fas fa-spinner fa-pulse"></i> Loading tasks...
+                        </p>
+                    </div>
+                </div>
+            </div>
+
+        </div>
+    </div>
+</body>
+</html>

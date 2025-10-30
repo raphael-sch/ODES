@@ -1,0 +1,2 @@
+# Ignore SQLite production database
+server/db/prod.db

@@ -1,0 +1,97 @@
+version: "3.9"
+
+services:
+  traefik:
+    image: traefik:v3
+    container_name: traefik
+    command:
+      - "--providers.docker=true"
+      - "--entrypoints.web.address=:80"
+      - "--entrypoints.websecure.address=:443"
+      - "--certificatesresolvers.le.acme.tlschallenge=true"
+      - "--certificatesresolvers.le.acme.email=rschuman@cl.uni-heidelberg.de"
+      - "--certificatesresolvers.le.acme.storage=/letsencrypt/acme.json"
+      - "--api.dashboard=true"
+    ports:
+      - "80:80"
+      - "443:443"
+      - "8080:8080" # Traefik dashboard
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - traefik_letsencrypt:/letsencrypt
+    restart: unless-stopped
+
+  app:
+    build: .
+    container_name: flask_app
+    command: gunicorn -k geventwebsocket.gunicorn.workers.GeventWebSocketWorker -w 1 app:app -b 0.0.0.0:5000 --access-logfile - --error-logfile -
+    volumes:
+      - .:/app
+      - ./db:/app/db
+    environment:
+      - FLASK_ENV=production
+      - REDIS_URL=redis://redis:6379/0
+    depends_on:
+      redis:
+        condition: service_healthy
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.app.rule=Host(`odesapi.schumann.pub`)"
+      - "traefik.http.routers.app.entrypoints=websecure"
+      - "traefik.http.routers.app.tls.certresolver=le"
+      - "traefik.http.services.app.loadbalancer.server.port=5000"
+
+  gui:
+    build: .
+    container_name: flask_gui
+    command: gunicorn -k geventwebsocket.gunicorn.workers.GeventWebSocketWorker -w 1 gui:app -b 0.0.0.0:5001 --access-logfile - --error-logfile -
+    volumes:
+      - .:/app
+      - ./db:/app/db
+    environment:
+      - FLASK_ENV=production
+      - REDIS_URL=redis://redis:6379/0
+    depends_on:
+      redis:
+        condition: service_healthy
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.gui.rule=Host(`odes.schumann.pub`)"
+      - "traefik.http.routers.gui.entrypoints=websecure"
+      - "traefik.http.routers.gui.tls.certresolver=le"
+      - "traefik.http.services.gui.loadbalancer.server.port=5001"
+
+  heartbeat_observer:
+    build: .
+    container_name: heartbeat_observer
+    command: python -u heartbeat_observer.py
+    volumes:
+      - .:/app
+      - ./db:/app/db
+    environment:
+      - FLASK_ENV=production
+      - REDIS_URL=redis://redis:6379/0
+    restart: unless-stopped
+    depends_on:
+      redis:
+        condition: service_healthy
+    labels:
+      - "traefik.enable=false"  # disable Traefik for this background service
+
+  redis:
+    image: redis:7
+    container_name: redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 2s
+      timeout: 1s
+      retries: 15
+
+volumes:
+  redis_data:
+  traefik_letsencrypt:

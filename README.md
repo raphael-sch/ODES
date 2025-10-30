@@ -5,6 +5,8 @@ Open Distributed Evolution Strategies (ODES) is a vibe-coded framework for distr
 ## Web Interface
 - [https://odes.schumann.pub](https://odes.schumann.pub/project/1)
 
+![Web Interface](image.png)
+
 ## Features
 - Distributed evolution strategy execution  
 - Lightweight Python client  

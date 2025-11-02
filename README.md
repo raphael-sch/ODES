@@ -5,7 +5,9 @@ Vibe-coded proof-of-concept for finetuning LLMs with evolution strategy (ES) and
 ## Web Interface
 - [https://odes.schumann.pub](https://odes.schumann.pub/project/1)
 
-![Web Interface](image.png)
+https://github.com/user-attachments/assets/08fa219c-c62e-4635-b7b7-ca9a3fc379b9
+
+
 
 ## Features
 - Distributed evolution strategy with dynamic population scaling
